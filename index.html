@@ -6,6 +6,69 @@
 <title>Casino Finance Tracker Pro</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ══════════════════════════════════════════════
+// 🔥 FIREBASE CONFIG — নিচে তোমার config বসাও
+// ══════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyArTUgbRyke2HlX1k0fhMAY6Pd0-eQD35U",
+  authDomain: "casino-tracker-9588b.firebaseapp.com",
+  projectId: "casino-tracker-9588b",
+  storageBucket: "casino-tracker-9588b.firebasestorage.app",
+  messagingSenderId: "1004639116231",
+  appId: "1:1004639116231:web:9b76db270f5ca12447d7e2",
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+// Expose to global scope
+window._fb = { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, doc, setDoc, getDoc, onSnapshot };
+
+// Auth state listener
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    window._currentUser = user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    document.getElementById('userDisplayName').textContent = user.displayName || user.email;
+    document.getElementById('userAvatar').textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+    // Load data from Firestore
+    loadFirestoreData(user.uid);
+  } else {
+    window._currentUser = null;
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+  }
+});
+
+async function loadFirestoreData(uid) {
+  const docRef = doc(db, 'users', uid);
+  // Real-time listener
+  onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      const d = snap.data();
+      data = d.trackerData || { devices:[], sites:[], entries:[] };
+    } else {
+      data = { devices:[], sites:[], entries:[] };
+    }
+    renderAll();
+  });
+}
+
+window._saveToFirestore = async function() {
+  if (!window._currentUser) return;
+  const docRef = doc(db, 'users', window._currentUser.uid);
+  await setDoc(docRef, { trackerData: data }, { merge: true });
+};
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -305,9 +368,73 @@ select:focus{outline:none;border-color:var(--accent);}
 .roi-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
 .roi-badge.pos{background:var(--profit-dim);color:var(--profit);}
 .roi-badge.neg{background:var(--loss-dim);color:var(--loss);}
+
+/* ===== AUTH SCREEN ===== */
+#authScreen{position:fixed;inset:0;background:var(--bg);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;}
+#mainApp{display:none;flex-direction:column;min-height:100vh;}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:420px;animation:modalIn 0.3s ease;}
+.auth-logo{text-align:center;margin-bottom:32px;}
+.auth-logo-icon{font-size:48px;filter:drop-shadow(0 0 16px rgba(245,200,66,0.5));}
+.auth-logo-title{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(90deg,#f5c842,#ff9f43);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-top:8px;}
+.auth-logo-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+.auth-tabs{display:flex;gap:0;background:var(--bg2);border-radius:10px;padding:4px;margin-bottom:24px;}
+.auth-tab{flex:1;padding:9px;text-align:center;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:all 0.2s;}
+.auth-tab.active{background:var(--card2);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.auth-field{margin-bottom:14px;}
+.auth-field label{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;}
+.auth-field input{width:100%;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;transition:all 0.2s;}
+.auth-field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(61,139,255,0.15);}
+.btn-auth-primary{width:100%;padding:13px;background:linear-gradient(135deg,#3d8bff,#7b5ea7);color:white;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:all 0.2s;}
+.btn-auth-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(61,139,255,0.4);}
+.auth-or{text-align:center;color:var(--muted);font-size:12px;margin:16px 0;position:relative;}
+.auth-or::before,.auth-or::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border);}
+.auth-or::before{left:0;}.auth-or::after{right:0;}
+.btn-google{width:100%;padding:12px;background:var(--card2);color:var(--text);border:1px solid var(--border2);border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.2s;}
+.btn-google:hover{border-color:var(--accent);background:var(--border);}
+.auth-error{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);color:var(--loss);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none;}
+/* User info in topbar */
+.user-info{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:8px;border:1px solid var(--border);transition:all 0.2s;}
+.user-info:hover{border-color:var(--border2);background:var(--card2);}
+.user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3d8bff,#7b5ea7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;}
+.user-name{font-size:12px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--profit);animation:pulse 2s infinite;}
 </style>
 </head>
 <body>
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🎰</div>
+      <div class="auth-logo-title">CASINO TRACKER</div>
+      <div class="auth-logo-sub">Sign in to sync your data across all devices</div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Register</div>
+    </div>
+    <div id="loginForm">
+      <div class="auth-field"><label>Email</label><input type="email" id="loginEmail" placeholder="your@email.com"></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')authLogin()"></div>
+      <button class="btn-auth-primary" onclick="authLogin()">Sign In</button>
+    </div>
+    <div id="registerForm" style="display:none;">
+      <div class="auth-field"><label>Email</label><input type="email" id="regEmail" placeholder="your@email.com"></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="regPass" placeholder="Min 6 characters" onkeydown="if(event.key==='Enter')authRegister()"></div>
+      <button class="btn-auth-primary" onclick="authRegister()">Create Account</button>
+    </div>
+    <div class="auth-or">or</div>
+    <button class="btn-google" onclick="authGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 32.8 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.5 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.4 18.9 12 24 12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.2 6.5 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.6 26.9 36 24 36c-5.2 0-9.6-3.2-11.3-7.7l-6.5 5C9.7 39.7 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40 35.8 44 30.4 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+      Continue with Google
+    </button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="mainApp">
 <div class="app">
 
 <!-- TOPBAR -->
@@ -332,6 +459,12 @@ select:focus{outline:none;border-color:var(--accent);}
     <div class="topbar-divider"></div>
     <div class="btn-icon" onclick="exportCSV()" title="Export CSV">📤</div>
     <div class="btn-icon" onclick="window.print()" title="Print">🖨️</div>
+    <div class="topbar-divider"></div>
+    <div class="user-info" onclick="authLogout()" title="Click to logout">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <div class="user-name" id="userDisplayName">...</div>
+      <div class="sync-dot" id="syncDot"></div>
+    </div>
   </div>
 </div>
 
@@ -521,6 +654,7 @@ select:focus{outline:none;border-color:var(--accent);}
 </div><!-- end content -->
 </div><!-- end main -->
 </div><!-- end app -->
+</div><!-- end mainApp -->
 
 <!-- MODALS -->
 <div id="addDeviceModal" class="overlay">
@@ -601,19 +735,52 @@ select:focus{outline:none;border-color:var(--accent);}
 <div class="toasts" id="toasts"></div>
 
 <script>
+// ===== AUTH FUNCTIONS =====
+function switchAuthTab(tab){
+  document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+  document.getElementById('loginForm').style.display = tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display = tab==='register'?'block':'none';
+  document.getElementById('authError').style.display='none';
+}
+function showAuthError(msg){ const el=document.getElementById('authError'); el.textContent=msg; el.style.display='block'; }
+async function authLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!email||!pass){ showAuthError('Email ও Password দিন'); return; }
+  try{ await window._fb.signInWithEmailAndPassword(window._fb.auth, email, pass); }
+  catch(e){ const m={'auth/user-not-found':'Account পাওয়া যায়নি','auth/wrong-password':'Password ভুল','auth/invalid-credential':'Email বা Password ভুল','auth/invalid-email':'Invalid email'}; showAuthError(m[e.code]||'Login failed'); }
+}
+async function authRegister(){
+  const email=document.getElementById('regEmail').value.trim();
+  const pass=document.getElementById('regPass').value;
+  if(!email||!pass){ showAuthError('Email ও Password দিন'); return; }
+  if(pass.length<6){ showAuthError('Password কমপক্ষে ৬ অক্ষর হতে হবে'); return; }
+  try{ await window._fb.createUserWithEmailAndPassword(window._fb.auth, email, pass); }
+  catch(e){ const m={'auth/email-already-in-use':'Email আগেই registered','auth/weak-password':'Password দুর্বল'}; showAuthError(m[e.code]||'Registration failed'); }
+}
+async function authGoogle(){
+  try{ await window._fb.signInWithPopup(window._fb.auth, window._fb.googleProvider); }
+  catch(e){ showAuthError('Google login failed. Firebase config চেক করুন।'); }
+}
+async function authLogout(){
+  if(!confirm('Logout করবেন?')) return;
+  await window._fb.signOut(window._fb.auth);
+}
+
 // ===== STATE =====
 let data = { devices:[], sites:[], entries:[] };
 const COLORS = ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#fd79a8','#fdcb6e','#00b894','#ff7675','#fab1a0','#74b9ff'];
 let editingDeviceId=null, editingSiteId=null, currentDeviceForSite=null;
 let plChart=null, devicePieChart=null, monthBarChart=null, siteBarChart=null;
 let chartRange=7;
+let _saveTimeout=null;
 
 // ===== INIT =====
 function init(){
-  loadData();
+  // Data will be loaded by Firebase onAuthStateChanged → loadFirestoreData
   setToday();
   buildFilters();
-  renderAll();
   document.getElementById('datePicker').addEventListener('change',()=>{
     updateDateLabel();
     renderToday();
@@ -622,11 +789,19 @@ function init(){
 }
 
 function loadData(){
-  try{ data=JSON.parse(localStorage.getItem('cftPro')||'{"devices":[],"sites":[],"entries":[]}'); }
-  catch(e){ data={devices:[],sites:[],entries:[]}; }
+  // No-op: data loaded from Firestore
 }
 
-function saveData(){ localStorage.setItem('cftPro',JSON.stringify(data)); }
+function saveData(){
+  // Debounced Firestore save
+  if(_saveTimeout) clearTimeout(_saveTimeout);
+  const syncDot = document.getElementById('syncDot');
+  if(syncDot) syncDot.style.background='var(--gold)';
+  _saveTimeout = setTimeout(async ()=>{
+    await window._saveToFirestore();
+    if(syncDot) syncDot.style.background='var(--profit)';
+  }, 800);
+}
 
 function renderAll(){
   renderTopbar();
