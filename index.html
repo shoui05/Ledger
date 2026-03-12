@@ -22,6 +22,7 @@ const firebaseConfig = {
   storageBucket: "casino-tracker-9588b.firebasestorage.app",
   messagingSenderId: "1004639116231",
   appId: "1:1004639116231:web:9b76db270f5ca12447d7e2",
+  measurementId: "G-288Y43H09F"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -755,6 +756,7 @@ async function authRegister(){
   const email=document.getElementById('regEmail').value.trim();
   const pass=document.getElementById('regPass').value;
   if(!email||!pass){ showAuthError('Email ও Password দিন'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showAuthError('সঠিক email address দিন'); return; }
   if(pass.length<6){ showAuthError('Password কমপক্ষে ৬ অক্ষর হতে হবে'); return; }
   try{ await window._fb.createUserWithEmailAndPassword(window._fb.auth, email, pass); }
   catch(e){ const m={'auth/email-already-in-use':'Email আগেই registered','auth/weak-password':'Password দুর্বল'}; showAuthError(m[e.code]||'Registration failed'); }
