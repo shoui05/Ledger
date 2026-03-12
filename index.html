@@ -41,6 +41,9 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById('mainApp').style.display = 'flex';
     document.getElementById('userDisplayName').textContent = user.displayName || user.email;
     document.getElementById('userAvatar').textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+    // ✅ CHANGE 1: dropdown এ নাম ও email set করো
+    document.getElementById('dropdownName').textContent = user.displayName || 'User';
+    document.getElementById('dropdownEmail').textContent = user.email || '';
     // Load data from Firestore
     loadFirestoreData(user.uid);
   } else {
@@ -157,7 +160,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .btn-sm{padding:6px 12px;font-size:12px;}
 
 /* ===== STAT CARDS ===== */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:all 0.3s;}
 .stat-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.3s;}
 .stat-card:hover::before{opacity:1;}
@@ -295,7 +298,6 @@ input[type="number"]:focus{outline:none;border-color:var(--accent);box-shadow:0 
   margin-left: 8px;
   align-items: center;
 }
-/* Original icon-btn kept for other uses, but dropdown replaces explicit edit/delete */
 .icon-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);transition:all 0.2s;}
 .icon-btn:hover{color:var(--text);border-color:var(--border2);}
 .icon-btn.danger:hover{color:var(--loss);border-color:var(--loss);}
@@ -404,11 +406,42 @@ select:focus{outline:none;border-color:var(--accent);}
 .bnav-icon{font-size:20px;line-height:1;}
 .bnav-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;}
 
+/* ✅ CHANGE 2: user-info — mobile এ name ও sync-dot লুকাও */
+.user-info{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:8px;border:1px solid var(--border);transition:all 0.2s;position:relative;}
+.user-info:hover{border-color:var(--border2);background:var(--card2);}
+.user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3d8bff,#7b5ea7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;}
+.user-name{font-size:12px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--profit);animation:pulse 2s infinite;}
+
+/* ✅ CHANGE 3: User dropdown popup */
+.user-dropdown{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  background:var(--card2);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  min-width:220px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6);
+  z-index:300;
+  overflow:hidden;
+  animation:modalIn 0.2s ease;
+}
+.user-dropdown.open{display:block;}
+.user-dropdown-info{padding:14px 16px;border-bottom:1px solid var(--border);}
+.user-dropdown-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.user-dropdown-email{font-size:11px;color:var(--muted);word-break:break-all;}
+.user-dropdown-logout{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--loss);cursor:pointer;transition:background 0.15s;}
+.user-dropdown-logout:hover{background:rgba(255,77,109,0.08);}
+
 @media(max-width:900px){
   .sidebar{display:none;}
   .bottom-nav{display:block;}
-  .devices-grid{grid-template-columns:1fr;}
   .content{padding-bottom:80px;}
+  /* ✅ mobile এ name ও sync-dot লুকাও */
+  .user-name{display:none;}
+  .sync-dot{display:none;}
 }
 @media(max-width:600px){
   .content{padding:12px;padding-bottom:80px;}
@@ -417,12 +450,14 @@ select:focus{outline:none;border-color:var(--accent);}
   .logo-text{font-size:16px;}
   .topbar-stat{display:none;}
   .topbar-divider{display:none;}
-  .site-inputs{grid-template-columns:1fr;}
+  
   .page-header{flex-direction:column;align-items:flex-start;}
   .date-bar{flex-wrap:wrap;gap:8px;}
   .date-label-display{width:100%;font-size:12px;}
   .chart-filters{flex-wrap:wrap;}
   .month-stats{flex-direction:column;gap:4px;align-items:flex-end;}
+  /* toast bottom nav এর উপরে */
+  .toasts{bottom:80px;right:12px;}
 }
 
 /* PULSE ANIMATION */
@@ -457,12 +492,6 @@ select:focus{outline:none;border-color:var(--accent);}
 .btn-google{width:100%;padding:12px;background:var(--card2);color:var(--text);border:1px solid var(--border2);border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.2s;}
 .btn-google:hover{border-color:var(--accent);background:var(--border);}
 .auth-error{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.3);color:var(--loss);padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px;display:none;}
-/* User info in topbar */
-.user-info{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:8px;border:1px solid var(--border);transition:all 0.2s;}
-.user-info:hover{border-color:var(--border2);background:var(--card2);}
-.user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3d8bff,#7b5ea7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;}
-.user-name{font-size:12px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--profit);animation:pulse 2s infinite;}
 </style>
 </head>
 <body>
@@ -525,11 +554,22 @@ select:focus{outline:none;border-color:var(--accent);}
     <div class="btn-icon" onclick="exportCSV()" title="Export CSV">📤</div>
     <div class="btn-icon" onclick="window.print()" title="Print">🖨️</div>
     <div class="topbar-divider"></div>
-    <div class="user-info" onclick="authLogout()" title="Click to logout">
+
+    <!-- ✅ CHANGE: user-info এ dropdown যোগ, click এ toggle -->
+    <div class="user-info" onclick="toggleUserDropdown(event)">
       <div class="user-avatar" id="userAvatar">?</div>
-      <div class="user-name" id="userDisplayName">...</div>
+      <div class="user-name" id="userDisplayName"></div>
       <div class="sync-dot" id="syncDot"></div>
+      <!-- dropdown popup -->
+      <div class="user-dropdown" id="userDropdown" onclick="event.stopPropagation()">
+        <div class="user-dropdown-info">
+          <div class="user-dropdown-name" id="dropdownName">—</div>
+          <div class="user-dropdown-email" id="dropdownEmail">—</div>
+        </div>
+        <div class="user-dropdown-logout" onclick="authLogout()">🚪 Logout</div>
+      </div>
     </div>
+
   </div>
 </div>
 
@@ -833,6 +873,16 @@ async function authLogout(){
   if(!confirm('Logout করবেন?')) return;
   await window._fb.signOut(window._fb.auth);
 }
+
+// ✅ CHANGE: User dropdown toggle
+function toggleUserDropdown(e){
+  e.stopPropagation();
+  document.getElementById('userDropdown').classList.toggle('open');
+}
+// বাইরে click করলে বন্ধ হবে
+document.addEventListener('click', function(){
+  document.getElementById('userDropdown')?.classList.remove('open');
+});
 
 // ===== STATE =====
 let data = { devices:[], sites:[], entries:[] };
