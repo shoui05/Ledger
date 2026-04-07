@@ -1153,15 +1153,15 @@ function renderMonthBarChart(){
 }
 
 // ===== TODAY =====
-function renderToday(){
-  const date=document.getElementById('datePicker').value;
-  const dayEntries=data.entries.filter(e=>e.date===date);
-  const dep=dayEntries.reduce((s,e)=>s+e.deposit,0);
-  const with_=dayEntries.reduce((s,e)=>s+e.withdraw,0);
-  const pl=with_-dep;
-  const all=data.entries.reduce((s,e)=>s+(e.withdraw-e.deposit),0);
+function renderToday() {
+  const date = document.getElementById('datePicker').value;
+  const dayEntries = data.entries.filter(e => e.date === date);
+  const dep = dayEntries.reduce((s, e) => s + e.deposit, 0);
+  const with_ = dayEntries.reduce((s, e) => s + e.withdraw, 0);
+  const pl = with_ - dep;
+  const all = data.entries.reduce((s, e) => s + (e.withdraw - e.deposit), 0);
 
-  document.getElementById('todayStats').innerHTML=`
+  document.getElementById('todayStats').innerHTML = `
     <div class="stat-card accent-card">
       <div class="stat-label"><span class="stat-icon">💰</span>Today's Deposit</div>
       <div class="stat-value accent">৳${fmtNum(dep)}</div>
@@ -1170,34 +1170,51 @@ function renderToday(){
       <div class="stat-label"><span class="stat-icon">💸</span>Today's Withdraw</div>
       <div class="stat-value accent">৳${fmtNum(with_)}</div>
     </div>
-    <div class="stat-card ${pl>=0?'profit-card':'loss-card'}">
+    <div class="stat-card ${pl >= 0 ? 'profit-card' : 'loss-card'}">
       <div class="stat-label"><span class="stat-icon">📊</span>Today's P/L</div>
       <div class="stat-value ${plClass(pl)}">${plSign(pl)}৳${fmtNum(pl)}</div>
-      <div class="stat-change">${dep>0?'ROI: '+(pl/dep*100).toFixed(1)+'%':''}</div>
+      <div class="stat-change">${dep > 0 ? 'ROI: ' + (pl / dep * 100).toFixed(1) + '%' : ''}</div>
     </div>
-    <div class="stat-card ${all>=0?'profit-card':'loss-card'}">
+    <div class="stat-card ${all >= 0 ? 'profit-card' : 'loss-card'}">
       <div class="stat-label"><span class="stat-icon">🏦</span>All-Time P/L</div>
       <div class="stat-value ${plClass(all)}">${plSign(all)}৳${fmtNum(all)}</div>
     </div>
   `;
 
-  const grid=document.getElementById('devicesGrid');
-  grid.innerHTML='';
-  data.devices.forEach((device,idx)=>{
-    const color=devColor(idx);
-    const deviceSites=data.sites.filter(s=>s.devId===device.id);
-    const devPL=data.entries.filter(e=>e.devId===device.id).reduce((s,e)=>s+(e.withdraw-e.deposit),0);
-    const card=document.createElement('div');
-    card.className='device-card';
-    const sitesHTML=deviceSites.map((site,si)=>{
-      const sitePL=data.entries.filter(e=>e.devId===device.id&&e.siteId===site.id).reduce((s,e)=>s+(e.withdraw-e.deposit),0);
-      const entry=data.entries.find(e=>e.devId===device.id&&e.siteId===site.id&&e.date===date);
-      const dep2=entry?.deposit||0, with2=entry?.withdraw||0;
+  const grid = document.getElementById('devicesGrid');
+  grid.innerHTML = '';
+  data.devices.forEach((device, idx) => {
+    const color = devColor(idx);
+    const deviceSites = data.sites.filter(s => s.devId === device.id);
+    const devPL = data.entries.filter(e => e.devId === device.id).reduce((s, e) => s + (e.withdraw - e.deposit), 0);
+
+    // Sort deviceSites: Modified sites first
+        // Sort deviceSites: Modified sites first
+    const sortedSites = [...deviceSites].sort((a, b) => {
+      const aEntry = data.entries.find(e => e.devId === device.id && e.siteId === a.id && e.date === date);
+      const bEntry = data.entries.find(e => e.devId === device.id && e.siteId === b.id && e.date === date);
+
+      const aModified = aEntry && (aEntry.deposit > 0 || aEntry.withdraw > 0);
+      const bModified = bEntry && (bEntry.deposit > 0 || bEntry.withdraw > 0);
+      
+      // Sort modified entries first
+      if (aModified && !bModified) return -1; // a comes first
+      if (!aModified && bModified) return 1; // b comes first
+      return 0; // Keep original order
+    });
+
+    const card = document.createElement('div');
+    card.className = 'device-card';
+    const sitesHTML = sortedSites.map((site, si) => {
+      const sitePL = data.entries.filter(e => e.devId === device.id && e.siteId === site.id).reduce((s, e) => s + (e.withdraw - e.deposit), 0);
+      const entry = data.entries.find(e => e.devId === device.id && e.siteId === site.id && e.date === date);
+      const dep2 = entry?.deposit || 0,
+        with2 = entry?.withdraw || 0;
       return `
         <div class="site-row">
           <div class="site-top">
             <div class="site-left">
-              <div class="site-num">${si+1}</div>
+              <div class="site-num">${si + 1}</div>
               <div class="site-name">${site.name}</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
@@ -1217,38 +1234,36 @@ function renderToday(){
           <div class="site-inputs">
             <div class="input-wrap">
               <label>💰 Deposit</label>
-              <input type="number" id="dep-${site.id}" step="0.01" value="${dep2||''}" placeholder="0.00" oninput="livePreview('${site.id}')">
+              <input type="number" id="dep-${site.id}" step="0.01" value="${dep2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
             </div>
             <div class="input-wrap">
               <label>💸 Withdraw</label>
-              <input type="number" id="wit-${site.id}" step="0.01" value="${with2||''}" placeholder="0.00" oninput="livePreview('${site.id}')">
+              <input type="number" id="wit-${site.id}" step="0.01" value="${with2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
             </div>
           </div>
           <div class="site-bottom">
-            <div class="pl-preview ${plClass((with2||0)-(dep2||0))}" id="prev-${site.id}">
-              P/L: ${plSign((with2||0)-(dep2||0))}৳${fmtNum((with2||0)-(dep2||0))}
+            <div class="pl-preview ${plClass((with2 || 0) - (dep2 || 0))}" id="prev-${site.id}">
+              P/L: ${plSign((with2 || 0) - (dep2 || 0))}৳${fmtNum((with2 || 0) - (dep2 || 0))}
             </div>
-            <button class="save-btn${entry?' saved':''}" id="savebtn-${site.id}" onclick="saveEntry('${device.id}','${site.id}')">
-              ${entry?'✓ Saved':'Save'}
+            <button class="save-btn${entry ? ' saved' : ''}" id="savebtn-${site.id}" onclick="saveEntry('${device.id}','${site.id}')">
+              ${entry ? '✓ Saved' : 'Save'}
             </button>
           </div>
         </div>`;
     }).join('');
 
-    // Device header with dropdown (moved from footer to header)
-    card.innerHTML=`
+    card.innerHTML = `
       <div class="device-card-glow" style="background:linear-gradient(90deg,${color},transparent);"></div>
       <div class="device-header">
         <div class="device-avatar" style="background:${color};">${device.name[0].toUpperCase()}</div>
         <div class="device-info">
           <div class="device-name">${device.name}</div>
           <div class="device-stats">
-            <div class="device-stat"><span class="label">Sessions: </span><span class="val">${data.entries.filter(e=>e.devId===device.id).length}</span></div>
+            <div class="device-stat"><span class="label">Sessions: </span><span class="val">${data.entries.filter(e => e.devId === device.id).length}</span></div>
             <div class="device-stat"><span class="label">Sites: </span><span class="val">${deviceSites.length}</span></div>
           </div>
         </div>
         <div class="device-pl-badge ${plClass(devPL)}">${plSign(devPL)}৳${fmtNum(devPL)}</div>
-        <!-- 3-dot dropdown for device moved here -->
         <div class="dropdown-container" style="margin-left:8px;">
           <div class="dropdown-btn" onclick="event.stopPropagation();toggleDropdown(this)">⋯</div>
           <div class="dropdown-menu">
@@ -1264,11 +1279,10 @@ function renderToday(){
     grid.appendChild(card);
   });
 
-  // add device card
-  const add=document.createElement('div');
-  add.className='add-device-card';
-  add.innerHTML='<div class="plus">+</div><div class="label">Add Device</div>';
-  add.onclick=()=>openModal('addDeviceModal');
+  const add = document.createElement('div');
+  add.className = 'add-device-card';
+  add.innerHTML = '<div class="plus">+</div><div class="label">Add Device</div>';
+  add.onclick = () => openModal('addDeviceModal');
   grid.appendChild(add);
   renderTopbar();
   updateSidebarStats();
