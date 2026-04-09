@@ -902,12 +902,54 @@ function init(){
     renderToday();
     renderTopbar();
   });
-  // close any open dropdown when clicking elsewhere
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.dropdown-container')) {
-      document.querySelectorAll('.dropdown-menu.show').forEach(menu => menu.classList.remove('show'));
+// close any open dropdown when clicking elsewhere
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown-container')) {
+    document.querySelectorAll('.dropdown-menu.show').forEach(menu => menu.classList.remove('show'));
+  }
+});
+
+// scroll করে 50 করে বাড়বে/কমবে
+document.addEventListener('wheel', function(e) {
+  if (e.target.type === 'number') {
+    e.preventDefault();
+    const val = parseFloat(e.target.value) || 0;
+    const delta = e.deltaY < 0 ? 50 : -50;
+    const newVal = Math.max(0, val + delta);
+    e.target.value = newVal % 1 === 0 ? newVal : newVal.toFixed(2);
+    e.target.dispatchEvent(new Event('input'));
+  }
+}, { passive: false });
+
+// ================== নতুন অংশ শুরু ==================
+// Mouse click (up/down arrow) এ সবসময় ১ করে বাড়বে/কমবে
+// প্রথম ক্লিকের 0.01 সমস্যা fix করার জন্য
+
+document.addEventListener('mousedown', function(e) {
+  if (e.target.type === 'number') {
+    const input = e.target;
+    
+    // spinner button-এ ক্লিক হলে step=1 জোর করে সেট করি
+    if (input.step !== '1') {
+      input.step = '1';
     }
+    
+    // value যদি decimal হয় তাহলে পরিষ্কার করে দেই
+    let val = parseFloat(input.value) || 0;
+    if (val % 1 !== 0) {
+      input.value = val.toFixed(2);   // অথবা Math.round(val) যদি integer চাও
+    }
+  }
+});
+
+// Page load-এ সব number input-এ step=1 সেট করে দেই
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('input[type="number"]').forEach(function(input) {
+    input.step = '1';
+    // প্রয়োজনে minও সেট করতে পারো
+    // input.min = '0';
   });
+});
 }
 
 function loadData(){
