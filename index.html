@@ -1188,19 +1188,21 @@ function renderToday() {
     const deviceSites = data.sites.filter(s => s.devId === device.id);
     const devPL = data.entries.filter(e => e.devId === device.id).reduce((s, e) => s + (e.withdraw - e.deposit), 0);
 
-    // Sort deviceSites: Modified sites first
-        // Sort deviceSites: Modified sites first
+    // Sort deviceSites: persistent order — today's entry > ever used > never used
     const sortedSites = [...deviceSites].sort((a, b) => {
-      const aEntry = data.entries.find(e => e.devId === device.id && e.siteId === a.id && e.date === date);
-      const bEntry = data.entries.find(e => e.devId === device.id && e.siteId === b.id && e.date === date);
+      const aToday = data.entries.find(e => e.devId === device.id && e.siteId === a.id && e.date === date);
+      const bToday = data.entries.find(e => e.devId === device.id && e.siteId === b.id && e.date === date);
+      const aHasToday = !!(aToday && (aToday.deposit > 0 || aToday.withdraw > 0));
+      const bHasToday = !!(bToday && (bToday.deposit > 0 || bToday.withdraw > 0));
 
-      const aModified = aEntry && (aEntry.deposit > 0 || aEntry.withdraw > 0);
-      const bModified = bEntry && (bEntry.deposit > 0 || bEntry.withdraw > 0);
-      
-      // Sort modified entries first
-      if (aModified && !bModified) return -1; // a comes first
-      if (!aModified && bModified) return 1; // b comes first
-      return 0; // Keep original order
+      const aHasEver = data.entries.some(e => e.devId === device.id && e.siteId === a.id);
+      const bHasEver = data.entries.some(e => e.devId === device.id && e.siteId === b.id);
+
+      if (aHasToday && !bHasToday) return -1;
+      if (!aHasToday && bHasToday) return 1;
+      if (aHasEver && !bHasEver) return -1;
+      if (!aHasEver && bHasEver) return 1;
+      return 0;
     });
 
     const card = document.createElement('div');
