@@ -59,9 +59,9 @@ async function loadFirestoreData(uid) {
   onSnapshot(docRef, (snap) => {
     if (snap.exists()) {
       const d = snap.data();
-      data = d.trackerData || { devices:[], sites:[], entries:[] };
+      const td = d.trackerData || {}; data = { devices:td.devices||[], sites:td.sites||[], entries:td.entries||[], spendings:td.spendings||[], archived:td.archived||[] };
     } else {
-      data = { devices:[], sites:[], entries:[] };
+      data = { devices:[], sites:[], entries:[], spendings:[], archived:[] };
     }
     renderAll();
   });
@@ -84,6 +84,7 @@ window._saveToFirestore = async function() {
   --border2:#253550;
   --text:#e8eaf0;
   --muted:#6b7fa3;
+  --special:#807ed8;
   --profit:#00e5a0;
   --profit-dim:#00e5a020;
   --loss:#ff4d6d;
@@ -157,7 +158,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .btn-danger:hover{background:rgba(255,77,109,0.25);}
 .btn-gold{background:rgba(245,200,66,0.15);color:var(--gold);border:1px solid rgba(245,200,66,0.3);}
 .btn-gold:hover{background:rgba(245,200,66,0.25);}
-.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-sm{padding:12px 12px;font-size:15px;}
 
 /* ===== STAT CARDS ===== */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
@@ -175,6 +176,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .stat-value.loss{color:var(--loss);}
 .stat-value.gold{color:var(--gold);}
 .stat-value.accent{color:var(--accent);}
+#minus_spending{color:var(--special);font-size:15px;margin-top:10px;}
 .stat-change{font-size:11px;color:var(--muted);margin-top:6px;}
 .stat-change.up{color:var(--profit);}
 .stat-change.down{color:var(--loss);}
@@ -310,7 +312,7 @@ input[type="number"]:focus{outline:none;border-color:var(--accent);box-shadow:0 
 /* ===== CHART SECTION ===== */
 .chart-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.chart-title{font-weight:700;font-size:16px;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;}
+.chart-title{font-weight:700;font-size:25px;font-family:'Rajdhani',sans-serif;letter-spacing:0.5px;}
 .chart-filters{display:flex;gap:6px;}
 .chart-filter{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;}
 .chart-filter.active{background:rgba(61,139,255,0.15);color:var(--accent);border-color:rgba(61,139,255,0.4);}
@@ -407,6 +409,9 @@ select:focus{outline:none;border-color:var(--accent);}
 .bnav-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;}
 
 /* ✅ CHANGE 2: user-info — mobile এ name ও sync-dot লুকাও */
+.eye-toggle-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);transition:all 0.2s;opacity:0.5;}
+.eye-toggle-btn:hover{color:var(--text);border-color:var(--border2);opacity:1;}
+.eye-toggle-btn.eye-active{opacity:1;color:#ff4d6d;border-color:rgba(255,77,109,0.5);background:rgba(255,77,109,0.1);filter:none;}
 .user-info{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:8px;border:1px solid var(--border);transition:all 0.2s;position:relative;}
 .user-info:hover{border-color:var(--border2);background:var(--card2);}
 .user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3d8bff,#7b5ea7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;}
@@ -566,6 +571,7 @@ select:focus{outline:none;border-color:var(--accent);}
           <div class="user-dropdown-name" id="dropdownName">—</div>
           <div class="user-dropdown-email" id="dropdownEmail">—</div>
         </div>
+        <div class="user-dropdown-logout" style="color:var(--muted);border-bottom:1px solid var(--border);" onclick="openArchiveModal()">🗄️ Archive</div>
         <div class="user-dropdown-logout" onclick="authLogout()">🚪 Logout</div>
       </div>
     </div>
@@ -638,6 +644,14 @@ select:focus{outline:none;border-color:var(--accent);}
       <div class="chart-header"><div class="chart-title">📊 Monthly Summary</div></div>
       <div class="chart-wrap" style="height:180px;"><canvas id="monthBarChart"></canvas></div>
     </div>
+  </div>
+   <!-- SPENDING TRACKER -->
+  <div class="chart-section" style="margin-top:20px;margin-bottom:20px;">
+    <div class="chart-header">
+      <div class="chart-title">💸 Spending Tracker</div>
+      <button class="btn btn-danger btn-sm" onclick="openModal('addSpendingModal')">+ Add Spending</button>
+    </div>
+    <div id="spendingContent"></div>
   </div>
 </div>
 
@@ -808,13 +822,39 @@ select:focus{outline:none;border-color:var(--accent);}
 
 <div id="deleteConfirmModal" class="overlay">
   <div class="modal">
-    <div class="modal-title">⚠️ Confirm Delete</div>
+    <div class="modal-title">⚠️ Confirm Action</div>
     <div style="color:var(--muted);font-size:14px;margin-bottom:24px;" id="deleteConfirmText"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('deleteConfirmModal')">Cancel</button>
-      <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+      <button class="btn btn-danger" id="deleteConfirmBtn">Confirm</button>
     </div>
   </div>
+</div>
+
+<div id="addSpendingModal" class="overlay">
+  <div class="modal">
+    <div class="modal-title">💸 Add Spending</div>
+    <div class="modal-field"><label>Date</label><input type="date" id="spendingDate"></div>
+    <div class="modal-field"><label>Amount (৳)</label><input type="number" id="spendingAmount" placeholder="0.00" min="0" step="1" onkeydown="if(event.key==='Enter')saveSpending()"></div>
+    <div class="modal-field"><label>Reason / Note</label><input type="text" id="spendingReason" placeholder="e.g. Withdrawal fee, Transfer cost" onkeydown="if(event.key==='Enter')saveSpending()"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('addSpendingModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="saveSpending()">Add Spending</button>
+    </div>
+  </div>
+</div>
+
+<div id="archiveModal" class="overlay">
+  <div class="modal" style="max-width:580px;width:95%;">
+    <div class="modal-title">🗄️ Archive</div>
+    <div id="archiveContent" style="max-height:420px;overflow-y:auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('archiveModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+</div>
 </div>
 
 <div class="bottom-nav">
@@ -885,7 +925,7 @@ document.addEventListener('click', function(){
 });
 
 // ===== STATE =====
-let data = { devices:[], sites:[], entries:[] };
+let data = { devices:[], sites:[], entries:[], spendings:[], archived:[] };
 const COLORS = ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#fd79a8','#fdcb6e','#00b894','#ff7675','#fab1a0','#74b9ff'];
 let editingDeviceId=null, editingSiteId=null, currentDeviceForSite=null;
 let plChart=null, devicePieChart=null, monthBarChart=null, siteBarChart=null;
@@ -909,47 +949,19 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// scroll করে 50 করে বাড়বে/কমবে
-document.addEventListener('wheel', function(e) {
-  if (e.target.type === 'number') {
+// scroll - only after click/focus on input
+let _fin = null;
+document.addEventListener('focusin', e=>{ if(e.target.type==='number') _fin=e.target; });
+document.addEventListener('focusout', e=>{ if(e.target.type==='number') _fin=null; });
+document.addEventListener('wheel', function(e){
+  if(_fin && document.activeElement===_fin){
     e.preventDefault();
-    const val = parseFloat(e.target.value) || 0;
-    const delta = e.deltaY < 0 ? 50 : -50;
-    const newVal = Math.max(0, val + delta);
-    e.target.value = newVal % 1 === 0 ? newVal : newVal.toFixed(2);
-    e.target.dispatchEvent(new Event('input'));
+    const v=parseFloat(_fin.value)||0, d=e.deltaY<0?50:-50;
+    const nv=Math.max(0,v+d);
+    _fin.value=nv%1===0?nv:nv.toFixed(2);
+    _fin.dispatchEvent(new Event('input'));
   }
-}, { passive: false });
-
-// ================== নতুন অংশ শুরু ==================
-// Mouse click (up/down arrow) এ সবসময় ১ করে বাড়বে/কমবে
-// প্রথম ক্লিকের 0.01 সমস্যা fix করার জন্য
-
-document.addEventListener('mousedown', function(e) {
-  if (e.target.type === 'number') {
-    const input = e.target;
-    
-    // spinner button-এ ক্লিক হলে step=1 জোর করে সেট করি
-    if (input.step !== '1') {
-      input.step = '1';
-    }
-    
-    // value যদি decimal হয় তাহলে পরিষ্কার করে দেই
-    let val = parseFloat(input.value) || 0;
-    if (val % 1 !== 0) {
-      input.value = val.toFixed(2);   // অথবা Math.round(val) যদি integer চাও
-    }
-  }
-});
-
-// Page load-এ সব number input-এ step=1 সেট করে দেই
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('input[type="number"]').forEach(function(input) {
-    input.step = '1';
-    // প্রয়োজনে minও সেট করতে পারো
-    // input.min = '0';
-  });
-});
+},{passive:false});
 }
 
 function loadData(){
@@ -977,6 +989,7 @@ function renderAll(){
   renderHeatmap();
   updateSidebarStats();
   buildFilters();
+  renderSpending();
 }
 
 // ===== NAVIGATION =====
@@ -1062,6 +1075,7 @@ function updateSidebarStats(){
 
 // ===== DASHBOARD =====
 function renderDashboard(){
+  renderSpending();
   const all=data.entries.reduce((s,e)=>s+(e.withdraw-e.deposit),0);
   const dep=data.entries.reduce((s,e)=>s+e.deposit,0);
   const with_=data.entries.reduce((s,e)=>s+e.withdraw,0);
@@ -1113,6 +1127,18 @@ function renderDashboard(){
       <div class="stat-value accent">${data.sites.length}</div>
       <div class="stat-change">across ${data.devices.length} devices</div>
       <div class="stat-trend">🎰</div>
+    </div>
+    <div class="stat-card loss-card">
+      <div class="stat-label"><span class="stat-icon">💸</span>Total Spending</div>
+      <div class="stat-value loss">৳${fmtNum((data.spendings||[]).reduce((s,x)=>s+x.amount,0))}</div>
+      <div class="stat-change">${(data.spendings||[]).length} expense(s)</div>
+      <div class="stat-trend">💸</div>
+    </div>
+    <div class="stat-card ${(all-(data.spendings||[]).reduce((s,x)=>s+x.amount,0))>=0?'profit-card':'loss-card'}">
+      <div class="stat-label"><span class="stat-icon">🏆</span>Net Profit</div>
+      <div class="stat-value ${plClass(all-(data.spendings||[]).reduce((s,x)=>s+x.amount,0))}">${plSign(all-(data.spendings||[]).reduce((s,x)=>s+x.amount,0))}৳${fmtNum(all-(data.spendings||[]).reduce((s,x)=>s+x.amount,0))}</div>
+      <div class="stat-change " id="minus_spending">After P/L & spending</div>
+      <div class="stat-trend">🏆</div>
     </div>
   `;
 
@@ -1230,32 +1256,45 @@ function renderToday() {
     const deviceSites = data.sites.filter(s => s.devId === device.id);
     const devPL = data.entries.filter(e => e.devId === device.id).reduce((s, e) => s + (e.withdraw - e.deposit), 0);
 
-    // Sort deviceSites: persistent order — today's entry > ever used > never used
-    const sortedSites = [...deviceSites].sort((a, b) => {
-      const aToday = data.entries.find(e => e.devId === device.id && e.siteId === a.id && e.date === date);
-      const bToday = data.entries.find(e => e.devId === device.id && e.siteId === b.id && e.date === date);
-      const aHasToday = !!(aToday && (aToday.deposit > 0 || aToday.withdraw > 0));
-      const bHasToday = !!(bToday && (bToday.deposit > 0 || bToday.withdraw > 0));
-
-      const aHasEver = data.entries.some(e => e.devId === device.id && e.siteId === a.id);
-      const bHasEver = data.entries.some(e => e.devId === device.id && e.siteId === b.id);
-
-      if (aHasToday && !bHasToday) return -1;
-      if (!aHasToday && bHasToday) return 1;
-      if (aHasEver && !bHasEver) return -1;
-      if (!aHasEver && bHasEver) return 1;
-      return 0;
-    });
+    // সেই date-এ যে site আগে save হয়েছে সেটা উপরে, পরেরটা নিচে।
+    // Save না হওয়া sites নিচে থাকবে serial order-এ। Disabled সবার শেষে।
+    const _siteIndex=(s)=>{ const i=data.sites.indexOf(s); return (s.createdAt&&s.createdAt>1e9)?s.createdAt:i>=0?i*1e13:1e15; };
+    const _activeSites=[...deviceSites].filter(s=>!s.disabled);
+    // সেই date বা তার আগের যেকোনো date-এ সবচেয়ে শেষে save হওয়া entry-র savedAt দিয়ে sort
+const _lastSavedAt=(s)=>{
+  const entries=data.entries.filter(e=>e.siteId===s.id&&e.devId===device.id&&e.date<=date);
+  if(!entries.length) return null;
+  return Math.max(...entries.map(e=>e.savedAt||0));
+};
+const _withEntry=_activeSites
+  .filter(s=>data.entries.some(e=>e.siteId===s.id&&e.devId===device.id&&e.date===date))
+  .sort((a,b)=>{
+    const ea=data.entries.find(e=>e.siteId===a.id&&e.devId===device.id&&e.date===date);
+    const eb=data.entries.find(e=>e.siteId===b.id&&e.devId===device.id&&e.date===date);
+    return (ea?.savedAt||0)-(eb?.savedAt||0);
+  });
+const _withoutEntry=_activeSites
+  .filter(s=>!data.entries.some(e=>e.siteId===s.id&&e.devId===device.id&&e.date===date))
+  .sort((a,b)=>{
+    const la=_lastSavedAt(a), lb=_lastSavedAt(b);
+    if(la!==null&&lb!==null) return la-lb;
+    if(la!==null) return -1;
+    if(lb!==null) return 1;
+    return _siteIndex(a)-_siteIndex(b);
+  });
+    const _disabled=[...deviceSites].filter(s=>s.disabled).sort((a,b)=>_siteIndex(a)-_siteIndex(b));
+    const allSortedSites=window._showDisabled?[..._withEntry,..._withoutEntry,..._disabled]:[..._withEntry,..._withoutEntry];
 
     const card = document.createElement('div');
     card.className = 'device-card';
-    const sitesHTML = sortedSites.map((site, si) => {
+    const sitesHTML = allSortedSites.map((site, si) => {
       const sitePL = data.entries.filter(e => e.devId === device.id && e.siteId === site.id).reduce((s, e) => s + (e.withdraw - e.deposit), 0);
       const entry = data.entries.find(e => e.devId === device.id && e.siteId === site.id && e.date === date);
       const dep2 = entry?.deposit || 0,
         with2 = entry?.withdraw || 0;
+      const isDisabled=!!site.disabled;
       return `
-        <div class="site-row">
+        <div class="site-row${isDisabled?' disabled-site':''}" style="${isDisabled?'opacity:0.6;background:rgba(255,77,109,0.1);border-color:rgba(255,77,109,0.3);':''}">
           <div class="site-top">
             <div class="site-left">
               <div class="site-num">${si + 1}</div>
@@ -1269,6 +1308,7 @@ function renderToday() {
                   <div class="dropdown-btn" onclick="event.stopPropagation();toggleDropdown(this)">⋯</div>
                   <div class="dropdown-menu">
                     <div class="dropdown-item" onclick="event.stopPropagation();editSite('${site.id}');closeDropdown(this)">✏️ Rename</div>
+                    <div class="dropdown-item" style="color:var(--gold);" onclick="event.stopPropagation();toggleSiteDisabled('${site.id}');closeDropdown(this)">${isDisabled?'✅ Enable':'🚫 Disable'}</div>
                     <div class="dropdown-item danger" onclick="event.stopPropagation();confirmDeleteSite('${site.id}');closeDropdown(this)">🗑 Delete</div>
                   </div>
                 </div>
@@ -1278,11 +1318,11 @@ function renderToday() {
           <div class="site-inputs">
             <div class="input-wrap">
               <label>💰 Deposit</label>
-              <input type="number" id="dep-${site.id}" step="0.01" value="${dep2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
+              <input type="number" id="dep-${site.id}" step="1" value="${dep2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
             </div>
             <div class="input-wrap">
               <label>💸 Withdraw</label>
-              <input type="number" id="wit-${site.id}" step="0.01" value="${with2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
+              <input type="number" id="wit-${site.id}" step="1" value="${with2 || ''}" placeholder="0.00" oninput="livePreview('${site.id}')">
             </div>
           </div>
           <div class="site-bottom">
@@ -1308,11 +1348,14 @@ function renderToday() {
           </div>
         </div>
         <div class="device-pl-badge ${plClass(devPL)}">${plSign(devPL)}৳${fmtNum(devPL)}</div>
-        <div class="dropdown-container" style="margin-left:8px;">
-          <div class="dropdown-btn" onclick="event.stopPropagation();toggleDropdown(this)">⋯</div>
-          <div class="dropdown-menu">
-            <div class="dropdown-item" onclick="event.stopPropagation();editDevice('${device.id}');closeDropdown(this)">✏️ Rename</div>
-            <div class="dropdown-item danger" onclick="event.stopPropagation();confirmDeleteDevice('${device.id}');closeDropdown(this)">🗑 Delete</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:8px;">
+          <div class="eye-toggle-btn${window._showDisabled?' eye-active':''}" id="eyeBtn-${device.id}" onclick="event.stopPropagation();toggleDisabledVisibility()" title="Disabled sites show/hide">👁</div>
+          <div class="dropdown-container">
+            <div class="dropdown-btn" onclick="event.stopPropagation();toggleDropdown(this)">⋯</div>
+            <div class="dropdown-menu">
+              <div class="dropdown-item" onclick="event.stopPropagation();editDevice('${device.id}');closeDropdown(this)">✏️ Rename</div>
+              <div class="dropdown-item danger" onclick="event.stopPropagation();confirmDeleteDevice('${device.id}');closeDropdown(this)">🗑 Delete</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1360,7 +1403,7 @@ function saveEntry(devId,siteId){
   const wit=parseFloat(document.getElementById('wit-'+siteId)?.value)||0;
   if(dep===0&&wit===0){ toast('Enter deposit or withdraw amount','error'); return; }
   data.entries=data.entries.filter(e=>!(e.devId===devId&&e.siteId===siteId&&e.date===date));
-  data.entries.push({id:uid(),devId,siteId,date,deposit:dep,withdraw:wit});
+  data.entries.push({id:uid(),devId,siteId,date,deposit:dep,withdraw:wit,savedAt:Date.now()});
   saveData(); renderToday(); renderDashboard(); updateSidebarStats();
   toast('Entry saved ✓','success');
   const btn=document.getElementById('savebtn-'+siteId);
@@ -1415,7 +1458,7 @@ function renderHistory(){
         <td>৳${fmtNum(e.withdraw)}</td>
         <td class="${plClass(pl)}-val">${plSign(pl)}৳${fmtNum(pl)}</td>
         <td>${roi?`<span class="roi-badge ${pl>=0?'pos':'neg'}">${pl>=0?'+':''}${roi}%</span>`:'-'}</td>
-        <td><div class="icon-btn danger" onclick="deleteEntry('${e.id}')">🗑</div></td>
+        <td><div class="icon-btn danger" onclick="confirmDeleteEntry('${e.id}')">🗑</div></td>
       </tr>`;
     }).join('');
   }
@@ -1430,6 +1473,21 @@ function renderHistory(){
     <div class="stat-card ${pl>=0?'profit-card':'loss-card'}"><div class="stat-label">📊 Filtered P/L</div><div class="stat-value ${plClass(pl)}">${plSign(pl)}৳${fmtNum(pl)}</div></div>
     <div class="stat-card accent-card"><div class="stat-label">🎯 Win Rate</div><div class="stat-value accent">${filtered.length?Math.round(wins/filtered.length*100)+'%':'—'}</div></div>
   `;
+}
+
+function confirmDeleteEntry(id){
+  const e=data.entries.find(x=>x.id===id); if(!e) return;
+  const dev=data.devices.find(d=>d.id===e.devId);
+  const site=data.sites.find(s=>s.id===e.siteId);
+  const pl=e.withdraw-e.deposit;
+  document.getElementById('deleteConfirmText').textContent=`Archive entry "${site?.name||'?'}" (${e.date}) — ${plSign(pl)}৳${fmtNum(pl)}? Restore later from Archive.`;
+  document.getElementById('deleteConfirmBtn').onclick=()=>{
+    if(!data.archived) data.archived=[];
+    data.archived.push({id:uid(),type:'entry',name:(site?.name||'Entry')+' — '+e.date,entryCount:0,deletedAt:new Date().toISOString(),entryData:{...e}});
+    data.entries=data.entries.filter(x=>x.id!==id);
+    saveData(); closeModal('deleteConfirmModal'); renderAll(); toast('Entry archived','info');
+  };
+  openModal('deleteConfirmModal');
 }
 
 function deleteEntry(id){
@@ -1642,17 +1700,11 @@ function updateDevice(){
 
 function confirmDeleteDevice(devId){
   const dev=data.devices.find(d=>d.id===devId);
-  document.getElementById('deleteConfirmText').textContent=`Delete "${dev?.name}" and all its sites and entries?`;
-  document.getElementById('deleteConfirmBtn').onclick=()=>{ deleteDevice(devId); closeModal('deleteConfirmModal'); };
+  document.getElementById('deleteConfirmText').textContent=`Archive "${dev?.name}" and all sites? Restore later.`;
+  document.getElementById('deleteConfirmBtn').onclick=()=>{ archiveItem('device',devId); closeModal('deleteConfirmModal'); toast('Device archived','info'); };
   openModal('deleteConfirmModal');
 }
-
-function deleteDevice(devId){
-  data.devices=data.devices.filter(d=>d.id!==devId);
-  data.sites=data.sites.filter(s=>s.devId!==devId);
-  data.entries=data.entries.filter(e=>e.devId!==devId);
-  saveData(); renderAll(); toast('Device deleted','info');
-}
+function deleteDevice(devId){ archiveItem('device',devId); }
 
 // ===== SITE CRUD =====
 function addSiteModal(devId){ currentDeviceForSite=devId; openModal('addSiteModal'); }
@@ -1660,7 +1712,7 @@ function addSiteModal(devId){ currentDeviceForSite=devId; openModal('addSiteModa
 function saveSite(){
   const name=document.getElementById('siteNameInput').value.trim();
   if(!name){ toast('Enter site name','error'); return; }
-  data.sites.push({id:uid(),devId:currentDeviceForSite,name});
+  data.sites.push({id:uid(),devId:currentDeviceForSite,name,createdAt:Date.now(),lastModified:Date.now()});
   saveData(); closeModal('addSiteModal'); document.getElementById('siteNameInput').value='';
   renderAll(); toast('Site added ✓','success');
 }
@@ -1681,21 +1733,175 @@ function updateSite(){
 
 function confirmDeleteSite(siteId){
   const site=data.sites.find(s=>s.id===siteId);
-  document.getElementById('deleteConfirmText').textContent=`Delete "${site?.name}" and all its entries?`;
-  document.getElementById('deleteConfirmBtn').onclick=()=>{ deleteSite(siteId); closeModal('deleteConfirmModal'); };
+  document.getElementById('deleteConfirmText').textContent=`Archive "${site?.name}"? Restore later from Archive.`;
+  document.getElementById('deleteConfirmBtn').onclick=()=>{ archiveItem('site',siteId); closeModal('deleteConfirmModal'); toast('Site archived','info'); };
+  openModal('deleteConfirmModal');
+}
+function deleteSite(siteId){ archiveItem('site',siteId); }
+
+
+// ===== DISABLED SITE TOGGLE =====
+window._showDisabled = false;
+function toggleDisabledVisibility(){
+  window._showDisabled = !window._showDisabled;
+  document.querySelectorAll('[id^="eyeBtn-"]').forEach(b=>{
+    b.classList.toggle('eye-active', window._showDisabled);
+  });
+  renderToday();
+}
+function toggleSiteDisabled(siteId){
+  const site=data.sites.find(s=>s.id===siteId);
+  if(!site) return;
+  site.disabled=!site.disabled;
+  saveData(); renderToday();
+  toast(site.disabled?'Site disabled':'Site enabled','info');
+}
+
+// ===== SPENDING TRACKER =====
+function renderSpending(){
+  const spendings=data.spendings||[];
+  const wrap=document.getElementById('spendingContent');
+  if(!wrap) return;
+  const total=spendings.reduce((s,x)=>s+x.amount,0);
+  const allPL=data.entries.reduce((s,e)=>s+(e.withdraw-e.deposit),0);
+  const net=allPL-total;
+  wrap.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px;">
+      <div class="stat-card loss-card" style="padding:14px;">
+        <div class="stat-label"><span class="stat-icon">💸</span>Total Spent</div>
+        <div class="stat-value loss" style="font-size:22px;">৳${fmtNum(total)}</div>
+      </div>
+      <div class="stat-card ${net>=0?'profit-card':'loss-card'}" style="padding:14px;">
+        <div class="stat-label"><span class="stat-icon">📊</span>Net P/L (after spending)</div>
+        <div class="stat-value ${plClass(net)}" style="font-size:22px;">${plSign(net)}৳${fmtNum(net)}</div>
+      </div>
+    </div>
+    ${spendings.length===0?'<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">No spending records yet. Click "+ Add Spending" to track your expenses.</div>':`
+    <div style="overflow-x:auto;">
+      <table class="data-table" style="font-size:13px;">
+        <thead><tr><th>Date</th><th>Amount</th><th>Reason</th><th></th></tr></thead>
+        <tbody>
+          ${[...spendings].sort((a,b)=>b.date.localeCompare(a.date)).map(sp=>`
+            <tr>
+              <td>${fmtDate(sp.date)}</td>
+              <td class="loss-val">-৳${fmtNum(sp.amount)}</td>
+              <td>${sp.reason||'—'}</td>
+              <td><div class="icon-btn danger" onclick="deleteSpending('${sp.id}')">🗑</div></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`}
+  `;
+}
+function saveSpending(){
+  const amt=parseFloat(document.getElementById('spendingAmount')?.value)||0;
+  const reason=document.getElementById('spendingReason')?.value.trim()||'';
+  const date=document.getElementById('spendingDate')?.value||new Date().toISOString().split('T')[0];
+  if(amt<=0){ toast('Amount দিন','error'); return; }
+  if(!data.spendings) data.spendings=[];
+  data.spendings.push({id:uid(),amount:amt,reason,date});
+  saveData(); closeModal('addSpendingModal');
+  document.getElementById('spendingAmount').value='';
+  document.getElementById('spendingReason').value='';
+  renderSpending(); toast('Spending added ✓','success');
+}
+function deleteSpending(id){
+  const sp=(data.spendings||[]).find(s=>s.id===id);
+  if(!sp) return;
+  document.getElementById('deleteConfirmText').textContent=`Delete spending "৳${fmtNum(sp.amount)}${sp.reason?' — '+sp.reason:''}"? It will be moved to Archive.`;
+  document.getElementById('deleteConfirmBtn').onclick=()=>{
+    // Archive the spending
+    if(!data.archived) data.archived=[];
+    data.archived.push({id:uid(),type:'spending',name:sp.reason||('Spending ৳'+fmtNum(sp.amount)),amount:sp.amount,reason:sp.reason,date:sp.date,spendingData:{...sp},entryCount:0,deletedAt:new Date().toISOString()});
+    data.spendings=(data.spendings||[]).filter(s=>s.id!==id);
+    saveData(); closeModal('deleteConfirmModal'); renderSpending(); toast('Spending archived','info');
+  };
   openModal('deleteConfirmModal');
 }
 
-function deleteSite(siteId){
-  data.sites=data.sites.filter(s=>s.id!==siteId);
-  data.entries=data.entries.filter(e=>e.siteId!==siteId);
-  saveData(); renderAll(); toast('Site deleted','info');
+// ===== BACKUP / ARCHIVE =====
+function openArchiveModal(){
+  document.getElementById('userDropdown')?.classList.remove('open');
+  renderArchive();
+  openModal('archiveModal');
+}
+function renderArchive(){
+  const archived=data.archived||[];
+  const wrap=document.getElementById('archiveContent');
+  if(!wrap) return;
+  if(!archived.length){
+    wrap.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">🗄️<br><br>Archive is empty.<br>Deleted sites/devices appear here.</div>';
+    return;
+  }
+  wrap.innerHTML=archived.map(item=>`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:700;font-size:14px;">${item.type==='site'?'🌐':item.type==='spending'?'💸':'📱'} ${item.name}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;">${item.type==='site'?'Site':item.type==='spending'?'Spending · ৳'+fmtNum(item.amount||0):'Device'} · ${item.type!=='spending'?(item.entryCount||0)+' entries · ':''}Deleted ${item.deletedAt?new Date(item.deletedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):''}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button class="btn btn-success btn-sm" onclick="restoreArchive('${item.id}')">♻️ Restore</button>
+        <button class="btn btn-danger btn-sm" onclick="permanentDelete('${item.id}')">🗑 Delete Forever</button>
+      </div>
+    </div>
+  `).join('');
+}
+function archiveItem(type,id){
+  if(!data.archived) data.archived=[];
+  if(type==='site'){
+    const site=data.sites.find(s=>s.id===id); if(!site) return;
+    const entries=data.entries.filter(e=>e.siteId===id);
+    data.archived.push({id:uid(),type:'site',name:site.name,devId:site.devId,entries,entryCount:entries.length,deletedAt:new Date().toISOString(),siteData:{...site}});
+    data.sites=data.sites.filter(s=>s.id!==id);
+    data.entries=data.entries.filter(e=>e.siteId!==id);
+  } else {
+    const dev=data.devices.find(d=>d.id===id); if(!dev) return;
+    const sites=data.sites.filter(s=>s.devId===id);
+    const entries=data.entries.filter(e=>e.devId===id);
+    data.archived.push({id:uid(),type:'device',name:dev.name,sites,entries,entryCount:entries.length,deletedAt:new Date().toISOString(),devData:{...dev}});
+    data.devices=data.devices.filter(d=>d.id!==id);
+    data.sites=data.sites.filter(s=>s.devId!==id);
+    data.entries=data.entries.filter(e=>e.devId!==id);
+  }
+  saveData(); renderAll();
+}
+function restoreArchive(archiveId){
+  const item=(data.archived||[]).find(a=>a.id===archiveId); if(!item) return;
+  if(!confirm('Restore "'+item.name+'"?')) return;
+  if(item.type==='site'){
+    if(!data.sites.find(s=>s.id===item.siteData.id)) data.sites.push(item.siteData);
+    item.entries.forEach(e=>{ if(!data.entries.find(x=>x.id===e.id)) data.entries.push(e); });
+  } else if(item.type==='spending'){
+    if(!data.spendings) data.spendings=[];
+    if(!data.spendings.find(s=>s.id===item.spendingData.id)) data.spendings.push(item.spendingData);
+  } else if(item.type==='entry'){
+    if(!data.entries.find(x=>x.id===item.entryData.id)) data.entries.push(item.entryData);
+  } else {
+    if(!data.devices.find(d=>d.id===item.devData.id)) data.devices.push(item.devData);
+    item.sites.forEach(s=>{ if(!data.sites.find(x=>x.id===s.id)) data.sites.push(s); });
+    item.entries.forEach(e=>{ if(!data.entries.find(x=>x.id===e.id)) data.entries.push(e); });
+  }
+  data.archived=data.archived.filter(a=>a.id!==archiveId);
+  saveData(); renderAll(); renderArchive(); toast('Restored ✓','success');
+}
+function permanentDelete(archiveId){
+  if(!confirm('Permanently delete? Cannot be undone!')) return;
+  data.archived=(data.archived||[]).filter(a=>a.id!==archiveId);
+  saveData(); renderArchive(); toast('Permanently deleted','info');
 }
 
 // ===== UTILS =====
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 
-function openModal(id){ document.getElementById(id).classList.add('active'); setTimeout(()=>document.querySelector('#'+id+' input')?.focus(),100); }
+function openModal(id){
+  document.getElementById(id).classList.add('active');
+  if(id==='addSpendingModal'){
+    const sd=document.getElementById('spendingDate');
+    if(sd&&!sd.value) sd.value=new Date().toISOString().split('T')[0];
+  }
+  setTimeout(()=>document.querySelector('#'+id+' input')?.focus(),100);
+}
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 
 // close on overlay click
